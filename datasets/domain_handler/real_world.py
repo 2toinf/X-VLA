@@ -50,37 +50,6 @@ class AIRAgilexHandler(BaseHDF5Handler):
         return range(0, max(0, T_left - 30), 2)
 
 
-class AIRAgilexHQHandler(BaseHDF5Handler):
-    """
-    AIR-AGILEX-HQ.
-    HDF5:
-      /observations/eef_6d        [T,20]  -> L(10)+R(10)
-      /observations/eef_left_time [T]
-      /observations/eef_right_time[T]
-    Grip thresholded from last channel (scaled by 50).
-    """
-    dataset_name = "AIR-AGILEX-HQ"
-
-    def build_left_right(
-        self, f: h5py.File
-    ) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray], Optional[np.ndarray], float, float]:
-        freq, qdur = 30.0, 2.0
-        eef = f["observations"]["eef_6d"][()]  # [T,20]
-        left, right = eef[:, :10], eef[:, 10:]
-        left[:,  -1] = (left[:,  -1] * 50 < 1.0)
-        right[:, -1] = (right[:, -1] * 50 < 1.0)
-        lt = f["/observations/eef_left_time"][()]
-        rt = f["/observations/eef_right_time"][()]
-        f.close()
-        return left, right, lt, rt, freq, qdur
-
-    def index_candidates(self, T_left: int, training: bool) -> Iterable[int]:
-        index =  list(range(0, max(0, T_left - 60)))
-        if training: random.shuffle(index)
-        return index
-
-    
-
 
 class AIRBotHandler(BaseHDF5Handler):
     """

@@ -168,5 +168,10 @@ class BaseHDF5Handler(DomainHandler):
                 "language_instruction": ins,
                 "image_input": image_input,
                 "image_mask": image_mask,
-                "abs_trajectory": torch.cat([lseq, rseq], -1).float()
+                "abs_trajectory": torch.nn.functional.pad(
+                    torch.cat([lseq, rseq], -1).float(),
+                    (0, 20 - lseq.shape[-1] - rseq.shape[-1]),
+                ),
+                "idx_for_delta": self.meta.get("idx_for_delta", []),
+                "idx_for_mask_proprio": self.meta.get("idx_for_mask_proprio", []),
             }

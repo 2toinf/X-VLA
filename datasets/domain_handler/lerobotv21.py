@@ -9,7 +9,8 @@ from .base import DomainHandler
 class LeRobotV21Handler(DomainHandler):
 
     # 默认超参数
-    CAMERA_VIEW = ["video.top_camera_view", "video.left_camera_view", "video.right_camera_view"]
+    # video.overlook_camera_view  / top_camera_view
+    CAMERA_VIEW = ["video.overlook_camera_view", "video.left_camera_view", "video.right_camera_view"]
     ACTION_KEY = ["action.joints", "action.gripper", "action.base"] # 12 + 2 + 3
     idx_for_delta = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16]
     idx_for_mask_proprio = [12, 13, 14, 15, 16]

@@ -252,15 +252,15 @@ class AutoActionSpace(BaseActionSpace):
         )
         return {"loss": loss}
 
-    def prepare_for_training(self, action, proprio):
-        action = action.clone()
-        proprio = proprio.clone()
-        # apply delta encoding if specified
-        if self.idx_for_delta:
-            action[..., self.idx_for_delta] -= proprio[..., self.idx_for_delta]
-        if self.idx_for_mask_proprio:
-            proprio[..., self.idx_for_mask_proprio] = 0.0
-        return action, proprio
+    # def prepare_for_training(self, action, proprio):
+    #     action = action.clone()
+    #     proprio = proprio.clone()
+    #     # apply delta encoding if specified
+    #     if self.idx_for_delta:
+    #         action[..., self.idx_for_delta] -= proprio[..., self.idx_for_delta]
+    #     if self.idx_for_mask_proprio:
+    #         proprio[..., self.idx_for_mask_proprio] = 0.0
+    #     return action, proprio
 
     def preprocess(self, proprio: torch.Tensor, action: torch.Tensor, mode: str = "train"):
         """

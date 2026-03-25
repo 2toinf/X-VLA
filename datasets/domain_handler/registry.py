@@ -23,7 +23,8 @@ from .lerobot_agibot import AGIBOTLeRobotHandler
 from .agiworld import AGIWolrdHandler
 from .robomind import RobomindHandler
 from .droid import DroidHandler
-from .real_world import AIRAgilexHandler, AIRAgilexHQHandler, AIRBotHandler, WidowxAirHandler
+from .real_world import AIRAgilexHandler, AIRBotHandler, WidowxAirHandler
+from .air_agilex_hq import AIRAgilexHQHandler
 from .simulations import BridgeHandler, LiberoHandler, VLABenchHandler, RobotWin2Handler, RobocasaHumanHandler, CalvinHandler, RT1Handler
 from .lerobotv21 import LeRobotV21Handler
 from .x2robot import X2RobotHandler
