@@ -35,7 +35,10 @@ DATA_WEIGHTS = {
     "agiworld-on-site-pour": 1.,
     "agiworld-on-site-microwave": 1.2,
     "agiworld-on-site-cloth": 1.2,
-    "agiworld-on-site-cloth-2": 0.1
+    "agiworld-on-site-cloth-2": 0.1,
+
+    # lerobot real-world
+    "arx_acone": 1.0,
 }
 
 DATA_DOMAIN_ID = {
@@ -77,6 +80,7 @@ DATA_DOMAIN_ID = {
     
     # lerobot-sim
     "lift2": 0,
+    "arx_acone": 5,
 
     # x2robot
     "x2robot": 0,

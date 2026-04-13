@@ -31,10 +31,11 @@ def create_dataloader(batch_size: int,
                       action_mode: str
                       ):
     return DataLoader(
-        InfiniteDataReader(metas_path, num_actions=num_actions, training=training, action_mode = action_mode),
+        InfiniteDataReader(metas_path, num_actions=num_actions, training=training, action_mode=action_mode),
         batch_size=batch_size,
         num_workers=4,
         pin_memory=True,
         worker_init_fn=worker_init_fn,
-        persistent_workers=True
+        persistent_workers=True,
+        prefetch_factor=4
     )
