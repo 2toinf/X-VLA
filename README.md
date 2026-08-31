@@ -69,7 +69,7 @@ This design avoids package conflicts and supports distributed inference across G
 
 - [ ] We observed a slight performance drop (around 1% across different datasets) after converting our models to the HF format, and we’re actively investigating the cause.
 
-#### 🧠 About Libero Setup and Evluation
+#### 🧠 About Libero Setup and Evaluation
 
 - [x] For questions about converting relative actions to absolute actions and our implementation, please first refer to issue [#2](https://github.com/2toinf/X-VLA/issues/2) and [#15](https://github.com/2toinf/X-VLA/issues/15). We have updated full preprocessing guidance [here](https://github.com/2toinf/X-VLA/blob/main/evaluation/libero/preprocess.md).
 
