@@ -181,8 +181,11 @@ class InfiniteDataReader(IterableDataset):
             if not local_indices:
                 # Tiny metadata files can contain fewer episodes than the
                 # number of workers. Keep the stream alive by assigning one
-                # deterministic episode to this shard; normal-sized training
-                # sets take the disjoint path above.
+                # deterministic episode to this shard during training;
+                # evaluation must not duplicate an episode just to feed an
+                # otherwise idle worker.
+                if not self.training:
+                    return
                 local_indices = [traj_indices[shard_id % len(traj_indices)]]
 
             episode_streams = (

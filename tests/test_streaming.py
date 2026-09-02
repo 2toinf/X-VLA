@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import pytest
 import torch
 
 from datasets import dataset as dataset_module
@@ -80,3 +81,22 @@ def test_training_reader_interleaves_distinct_episodes(monkeypatch):
     samples = [next(stream) for _ in range(4)]
 
     assert [sample["episode"] for sample in samples] == [0, 1, 0, 1]
+
+
+def test_evaluation_reader_does_not_duplicate_tiny_dataset_shards(monkeypatch):
+    class FakeHandler:
+        def __init__(self, meta, num_views):
+            del meta, num_views
+
+    monkeypatch.setattr(dataset_module, "get_handler_cls", lambda _: FakeHandler)
+    reader = InfiniteDataReader.__new__(InfiniteDataReader)
+    reader.training = False
+    reader.rank = 1
+    reader.world_size = 2
+    reader.num_views = 1
+    reader.metas = {"demo": {"datalist": [0]}}
+
+    stream = reader._iter_one_dataset("demo", shard_id=1, num_shards=2)
+
+    with pytest.raises(StopIteration):
+        next(stream)
