@@ -28,10 +28,24 @@ def create_dataloader(batch_size: int,
                       metas_path: str, 
                       num_actions: int,
                       training: bool,
-                      action_mode: str
+                      action_mode: str,
+                      rank: int = 0,
+                      world_size: int = 1,
+                      seed: int = 0,
                       ):
     return DataLoader(
-        InfiniteDataReader(metas_path, num_actions=num_actions, training=training, action_mode = action_mode),
+        InfiniteDataReader(
+            metas_path,
+            num_actions=num_actions,
+            training=training,
+            action_mode=action_mode,
+            rank=rank,
+            world_size=world_size,
+            seed=seed,
+            # A worker builds each batch locally. Interleaving at least one
+            # episode per batch prevents long trajectories from dominating it.
+            episode_buffer_size=batch_size,
+        ),
         batch_size=batch_size,
         num_workers=4,
         pin_memory=True,

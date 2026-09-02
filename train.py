@@ -200,6 +200,9 @@ def main(args):
         num_actions=model.num_actions,
         action_mode=model.action_mode,
         training=True,
+        rank=accelerator.process_index,
+        world_size=accelerator.num_processes,
+        seed=args.seed,
     )
 
     # Optimizer
