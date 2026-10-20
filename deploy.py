@@ -19,11 +19,12 @@ import os
 import os.path as osp
 import json
 import torch
+from models.device import resolve_device
 from models.modeling_xvla import XVLA
 from models.processing_xvla import XVLAProcessor
 import sys
 
-def main():
+def build_parser():
     parser = argparse.ArgumentParser(description="Launch XVLA inference FastAPI server")
     parser.add_argument("--model_path", type=str, required=True,
                         help="Path to the pretrained XVLA model directory")
@@ -31,15 +32,19 @@ def main():
     parser.add_argument('--LoRA_path', type=str, default=None)
     parser.add_argument("--output_dir", type=str, default="./logs",
                         help="Directory to save runtime info (info.json)")
-    parser.add_argument("--device", type=str, default="cuda",
-                        help="Device to load model on (cuda / cpu / auto)")
+    parser.add_argument("--device", type=str, default=None,
+                        help="Device to load model on (xpu / cuda / cpu / auto). "
+                             "Default: auto-detect (xpu, then cuda, then cpu)")
     parser.add_argument("--port", default=8010, type=int,
                         help="Port number for FastAPI server")
     parser.add_argument("--host", default="0.0.0.0", type=str,
                         help="Host address for FastAPI server")
     parser.add_argument("--disable_slurm", action="store_true", default=False)
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = build_parser().parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
 
     print("🚀 Starting XVLA Inference Server...")
@@ -51,10 +56,7 @@ def main():
     # --------------------------------------------------------------------------
     # Select device automatically
     # --------------------------------------------------------------------------
-    if args.device == "auto":
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    else:
-        device = torch.device(args.device)
+    device = resolve_device(args.device)
     print(f"🧠 Using device: {device}")
 
     # --------------------------------------------------------------------------

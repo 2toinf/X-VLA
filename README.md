@@ -59,6 +59,23 @@ conda env create -f environment.yml
 conda activate xvla-stable
 ```
 
+### How to run the same on Intel's XPU
+
+Install the XPU build of PyTorch instead of a CUDA one, then the remaining requirements (the `torch` and `torchvision` builds you already installed are kept as they are):
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/xpu
+pip install -r requirements.txt
+```
+
+Start the server with `deploy.py`. The device is detected on its own (XPU, then CUDA, then CPU), and `--device xpu:0` or `--device cpu` forces one. `ZE_AFFINITY_MASK=0` picks the card the way `CUDA_VISIBLE_DEVICES=0` does:
+
+```bash
+ZE_AFFINITY_MASK=0 python deploy.py --model_path 2toINF/X-VLA-Pt --port 8000
+```
+
+The client side and the `/act` request are unchanged. `flash-attn` is optional and is not used on XPU, where the Florence-2 backbone runs on PyTorch SDPA attention. The simulator evaluation clients under `evaluation/` are not covered.
+
 ---
 ### 2️⃣ Deploying X-VLA for Inference
 
