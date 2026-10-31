@@ -65,11 +65,30 @@ ALL_TASKS = [
 
 print("Number of tasks evaluating:", len(ALL_TASKS))
 
-def quat_to_rotate6D(q: np.ndarray) -> np.ndarray:
+def _env_flag(name: str, default: bool = False) -> bool:
+    v = os.environ.get(name)
+    if v is None:
+        return default
+    return v.strip().lower() in ("1", "true", "yes", "on")
+
+
+# Quaternion order (see issue #93).
+# RoboTwin reports and consumes end-effector quaternions scalar-first (wxyz,
+# transforms3d convention), while SciPy's Rotation uses scalar-last (xyzw).
+# The legacy behaviour (scalar_first=False) passes the 4 numbers through
+# unchanged on both the observation and the action side; the mismatch cancels
+# out end-to-end and this is what the released X-VLA-RoboTwin2 checkpoint was
+# trained with. scalar_first=True converts wxyz <-> xyzw explicitly so the
+# rotation-6D matches the physical rotation; use it together with
+# XVLA_ROBOTWIN_QUAT_SCALAR_FIRST=1 on the training side.
+def quat_to_rotate6D(q: np.ndarray, scalar_first: bool = False) -> np.ndarray:
+    q = np.asarray(q)
+    if scalar_first:
+        q = q[..., [1, 2, 3, 0]]  # wxyz -> xyzw (works on any SciPy version)
     return R.from_quat(q).as_matrix()[..., :, :2].reshape(q.shape[:-1] + (6,))
 
 
-def rotate6D_to_quat(v6: np.ndarray) -> np.ndarray:
+def rotate6D_to_quat(v6: np.ndarray, scalar_first: bool = False) -> np.ndarray:
     v6 = np.asarray(v6)
     if v6.shape[-1] != 6:
         raise ValueError("Last dimension must be 6 (got %s)" % (v6.shape[-1],))
@@ -81,7 +100,10 @@ def rotate6D_to_quat(v6: np.ndarray) -> np.ndarray:
     b2 = b2 / np.linalg.norm(b2, axis=-1, keepdims=True)
     b3 = np.cross(b1, b2)
     rot_mats = np.stack((b1, b2, b3), axis=-1)      # shape (..., 3, 3)
-    return R.from_matrix(rot_mats).as_quat()
+    q = R.from_matrix(rot_mats).as_quat()           # xyzw
+    if scalar_first:
+        q = q[..., [3, 0, 1, 2]]  # xyzw -> wxyz
+    return q
 
 def decode_image_from_bytes(camera_rgb_image):
     if isinstance(camera_rgb_image, (bytes, bytearray)): camera_rgb_image = np.frombuffer(camera_rgb_image, dtype=np.uint8)
@@ -96,9 +118,12 @@ def decode_image_from_bytes(camera_rgb_image):
 
 
 class ClientModel:
-    def __init__(self, host, port):
+    def __init__(self, host, port, quat_scalar_first: bool = False):
         self.url = f"http://{host}:{port}/act"
         self.vision_record = []
+        # Whether RoboTwin's wxyz quaternions are converted to/from SciPy's
+        # xyzw order (True) or passed through unchanged (False, legacy).
+        self.quat_scalar_first = quat_scalar_first
         
     def set_instruction(self, instruction):
         self.instruction = instruction
@@ -122,10 +147,10 @@ class ClientModel:
         right_grip = 1 - right_grip * 2
         abs_eef = np.concatenate([
             left_ee[:, :3],
-            quat_to_rotate6D(left_ee[:, 3:]),                        # (T,7)
+            quat_to_rotate6D(left_ee[:, 3:], self.quat_scalar_first),   # (T,6)
             left_grip[:, None],             # (T,1)
             right_ee[:, :3],
-            quat_to_rotate6D(right_ee[:, 3:]),                       # (T,7)
+            quat_to_rotate6D(right_ee[:, 3:], self.quat_scalar_first),  # (T,6)
             right_grip[:, None]             # (T,1)
         ], axis=-1)
         self.vision_record.append(image_obs)
@@ -218,20 +243,21 @@ def _rollout(env, policy):
     idx = 0
     obs = env.get_obs() # get observation
     # If it is not successful within the specified number of steps (here, 10 steps), it is judged as a failure.‘
+    scalar_first = getattr(policy, "quat_scalar_first", False)
     for j in range(10):
         actions = policy.step(obs)
         left_xyz = actions[:, :3]  # (B, 3)
         left_rotate6d = actions[:, 3:9]  # (B, 6)
         left_gripper = actions[:, 9:10]  # (B, 1)  # Use 9:10 to keep 2D shape
         # Convert 6D rotation to quaternion (4 elements)
-        left_quat = rotate6D_to_quat(left_rotate6d)  # Should return (B, 4)
+        left_quat = rotate6D_to_quat(left_rotate6d, scalar_first)  # Should return (B, 4)
         left_grip = 1 - 2 * (left_gripper > 0.7)
         # Ensure all have shape (B, features) and concatenate along axis 1
         left_new = np.concatenate([left_xyz, left_quat, left_grip], axis=1)  # (B, 3+4+1) = (B, 8)
         # Do the same for right arm
         right_xyz = actions[:, 10:13].reshape(-1, 3)  # (B, 3)
         right_rotate6d = actions[:, 13:19].reshape(-1, 6)  # (B, 6)
-        right_quat = rotate6D_to_quat(right_rotate6d)  # (B, 4)
+        right_quat = rotate6D_to_quat(right_rotate6d, scalar_first)  # (B, 4)
         right_gripper = actions[:, 19:20].reshape(-1, 1)  # (B, 1)
         # reset model gripper output
         right_grip = 1 - 2 * (right_gripper > 0.7)
@@ -239,7 +265,7 @@ def _rollout(env, policy):
         # Final rollout action (16 dimensions total)
         rollout_action = np.concatenate([left_new, right_new], axis=1)  # (B, 16)
         for action in tqdm(rollout_action):
-            env.take_action(action, action_type='ee')  # target_pose: np.array([x, y, z, qx, qy, qz, qw])
+            env.take_action(action, action_type='ee')  # target_pose: np.array([x, y, z, qw, qx, qy, qz]) (RoboTwin is wxyz)
             obs = env.get_obs()
             obs['endpose']['left_endpose'] = list(action[:7].reshape(7,))
             obs['endpose']['right_endpose'] = list(action[8:-1].reshape(7,))
@@ -385,10 +411,15 @@ def main():
     parser.add_argument("--task_config", type=str, required=True, help="Task config name (without .yml)")
     parser.add_argument("--output_path", type=str, required=True, help="Where to save the output video")
     parser.add_argument("--instruction_type", type=str, required=False, help="Where to save the output video")
+    parser.add_argument("--quat_scalar_first", action="store_true",
+                        default=_env_flag("XVLA_ROBOTWIN_QUAT_SCALAR_FIRST", False),
+                        help="Treat RoboTwin quaternions as wxyz and convert to/from SciPy's xyzw. "
+                             "Off by default for compatibility with the released X-VLA-RoboTwin2 checkpoint; "
+                             "enable for checkpoints trained with XVLA_ROBOTWIN_QUAT_SCALAR_FIRST=1.")
     args = parser.parse_args()
     kwargs = vars(args)
     
-    model = ClientModel(host=kwargs['host'], port=kwargs['port'])
+    model = ClientModel(host=kwargs['host'], port=kwargs['port'], quat_scalar_first=args.quat_scalar_first)
     if args.task_name == 'all':
         for task in tqdm(ALL_TASKS):
             print(f"Evaluating task {task} for {kwargs['num_episodes']} episodes...")
