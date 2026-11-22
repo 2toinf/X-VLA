@@ -83,29 +83,30 @@ class InfiniteDataReader(IterableDataset):
         self.image_aug = transforms.Compose(self.image_aug)
 
     def _iter_one_dataset(self, dataset_name: str) -> Iterable[dict]:
-        meta = self.metas[dataset_name]
-        traj_indices = list(range(len(meta["datalist"])))
-        if self.training: random.shuffle(traj_indices)
-        
-        if 'robot_type' in meta.keys(): robot_type = meta['robot_type']
-        else: robot_type = dataset_name
-        Handler = get_handler_cls(robot_type)
-        handler = Handler(meta=meta, num_views=self.num_views)
-        for traj_idx in traj_indices:
-                for sample in handler.iter_episode(
-                    traj_idx,
-                    num_actions=self.num_actions,
-                    training=self.training,
-                    image_aug=self.image_aug,
-                    lang_aug_map= meta["lang_aug_map"] if "lang_aug_map" in meta.keys() else None,
-                    action_mode = self.action_mode
-                ):
-                    sample["domain_id"] = torch.tensor(DATA_DOMAIN_ID.get(robot_type, 0))
-                    idx_for_delta = sample.pop("idx_for_delta", [])
-                    idx_for_mask_proprio = sample.pop("idx_for_mask_proprio", [])
-                    sample.update(action_slice(sample.pop("abs_trajectory", None), idx_for_delta, idx_for_mask_proprio))
-                    yield sample
-        if self.training: yield from self._iter_one_dataset(dataset_name)
+        while True:
+            meta = self.metas[dataset_name]
+            traj_indices = list(range(len(meta["datalist"])))
+            if self.training: random.shuffle(traj_indices)
+
+            if 'robot_type' in meta.keys(): robot_type = meta['robot_type']
+            else: robot_type = dataset_name
+            Handler = get_handler_cls(robot_type)
+            handler = Handler(meta=meta, num_views=self.num_views)
+            for traj_idx in traj_indices:
+                    for sample in handler.iter_episode(
+                        traj_idx,
+                        num_actions=self.num_actions,
+                        training=self.training,
+                        image_aug=self.image_aug,
+                        lang_aug_map= meta["lang_aug_map"] if "lang_aug_map" in meta.keys() else None,
+                        action_mode = self.action_mode
+                    ):
+                        sample["domain_id"] = torch.tensor(DATA_DOMAIN_ID.get(robot_type, 0))
+                        idx_for_delta = sample.pop("idx_for_delta", [])
+                        idx_for_mask_proprio = sample.pop("idx_for_mask_proprio", [])
+                        sample.update(action_slice(sample.pop("abs_trajectory", None), idx_for_delta, idx_for_mask_proprio))
+                        yield sample
+            if not self.training: return
 
 
     def __iter__(self):
