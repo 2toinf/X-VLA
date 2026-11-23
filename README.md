@@ -59,6 +59,25 @@ conda env create -f environment.yml
 conda activate xvla-stable
 ```
 
+#### Run on Intel GPU (XPU)
+
+X-VLA inference also runs on Intel GPUs (for example Arc Pro B60) through PyTorch's XPU backend. Install the XPU build of PyTorch first, then the rest of the requirements:
+
+```bash
+conda create -n XVLA python=3.10 -y
+conda activate XVLA
+pip install torch torchvision --index-url https://download.pytorch.org/whl/xpu
+pip install -r requirements.txt
+```
+
+Start the inference server on the XPU (`--device auto`, the default, also picks the XPU when no CUDA GPU is present):
+
+```bash
+python -m deploy --model_path 2toINF/X-VLA-Libero --port 8000 --device xpu
+```
+
+When you load the model from Python as in step 3, move it to the device first (`model = model.to("xpu")`); the `/act` endpoint then places every input on the model's device. Still CUDA only: the optional `flash_attention_2` path of the Florence-2 backbone (without `flash-attn` the backbone uses its standard attention, which runs on XPU), the training scripts, and the clients under `evaluation/simpler` and `evaluation/SoftFold-Agilex`, which call `.cuda()` directly.
+
 ---
 ### 2️⃣ Deploying X-VLA for Inference
 

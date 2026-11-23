@@ -23,6 +23,16 @@ from models.modeling_xvla import XVLA
 from models.processing_xvla import XVLAProcessor
 import sys
 
+
+def get_default_device() -> torch.device:
+    """Pick CUDA when present, then Intel XPU, then CPU."""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if hasattr(torch, "xpu") and torch.xpu.is_available():
+        return torch.device("xpu")
+    return torch.device("cpu")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Launch XVLA inference FastAPI server")
     parser.add_argument("--model_path", type=str, required=True,
@@ -31,8 +41,8 @@ def main():
     parser.add_argument('--LoRA_path', type=str, default=None)
     parser.add_argument("--output_dir", type=str, default="./logs",
                         help="Directory to save runtime info (info.json)")
-    parser.add_argument("--device", type=str, default="cuda",
-                        help="Device to load model on (cuda / cpu / auto)")
+    parser.add_argument("--device", type=str, default="auto",
+                        help="Device to load model on (auto / cuda / xpu / cpu); auto picks cuda, then xpu, then cpu")
     parser.add_argument("--port", default=8010, type=int,
                         help="Port number for FastAPI server")
     parser.add_argument("--host", default="0.0.0.0", type=str,
@@ -52,7 +62,7 @@ def main():
     # Select device automatically
     # --------------------------------------------------------------------------
     if args.device == "auto":
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = get_default_device()
     else:
         device = torch.device(args.device)
     print(f"🧠 Using device: {device}")
